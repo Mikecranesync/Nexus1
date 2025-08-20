@@ -1,0 +1,1 @@
+- make this version 1.0.0 commit changes and turn on version control in github make this a recovery point
