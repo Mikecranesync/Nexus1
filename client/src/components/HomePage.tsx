@@ -1,9 +1,31 @@
+import { useAuth } from '../hooks/useAuth';
+
 export function HomePage() {
+  const { isAuthenticated } = useAuth();
+  
+  // Get organization setup data if it exists
+  const getOrganizationData = () => {
+    const orgData = localStorage.getItem('organizationSetup');
+    return orgData ? JSON.parse(orgData) : null;
+  };
+  
+  const orgData = getOrganizationData();
+
   return (
     <div className="page-container">
       <div className="welcome-card">
         <h1>Welcome to Nexus</h1>
-        <p>Your elegant mobile-first experience starts here</p>
+        {isAuthenticated && orgData ? (
+          <div>
+            <p>Welcome back to <strong>{orgData.name}</strong>!</p>
+            <p style={{ fontSize: '0.9rem', color: '#666' }}>
+              Industry: {orgData.industry.charAt(0).toUpperCase() + orgData.industry.slice(1).replace('-', ' ')}
+            </p>
+          </div>
+        ) : (
+          <p>Your elegant mobile-first experience starts here</p>
+        )}
+        
         <button className="mobile-button touch-target">
           Get Started
         </button>
@@ -19,6 +41,7 @@ export function HomePage() {
           <li>🚀 Progressive Web App</li>
           <li>🎨 Touch-friendly interface</li>
           <li>📱 Works offline</li>
+          {isAuthenticated && <li>🏢 Organization setup</li>}
         </ul>
       </div>
     </div>

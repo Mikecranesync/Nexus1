@@ -1,12 +1,32 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { GoogleLoginButton } from './GoogleLoginButton';
+import { useAuth } from '../hooks/useAuth';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Login attempt:', { email, password });
+  };
+
+  const handleGoogleSuccess = (user: { name: string; email: string; picture: string; given_name?: string; family_name?: string }) => {
+    login(user);
+    // Check if organization setup is needed
+    const orgSetup = localStorage.getItem('organizationSetup');
+    if (!orgSetup) {
+      navigate('/organization-setup');
+    } else {
+      navigate('/');
+    }
+  };
+
+  const handleGoogleError = (error: string) => {
+    console.error('Google login error:', error);
   };
 
   return (
@@ -15,7 +35,26 @@ export function LoginPage() {
         <h2>Welcome Back</h2>
         <p>Sign in to your Nexus account</p>
         
-        <form onSubmit={handleSubmit} style={{ marginTop: '2rem' }}>
+        <div style={{ marginTop: '2rem', marginBottom: '2rem' }}>
+          <GoogleLoginButton 
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+          />
+        </div>
+        
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          margin: '2rem 0',
+          fontSize: '0.9rem',
+          color: '#666'
+        }}>
+          <div style={{ flex: 1, height: '1px', backgroundColor: '#e0e0e0' }}></div>
+          <div style={{ padding: '0 1rem' }}>or continue with email</div>
+          <div style={{ flex: 1, height: '1px', backgroundColor: '#e0e0e0' }}></div>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '1rem' }}>
             <input
               type="email"
