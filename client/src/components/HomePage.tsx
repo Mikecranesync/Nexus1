@@ -1,7 +1,9 @@
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 export function HomePage() {
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   
   // Get organization setup data if it exists
   const getOrganizationData = () => {
@@ -10,6 +12,34 @@ export function HomePage() {
   };
   
   const orgData = getOrganizationData();
+
+  // Handle Learn More button click
+  const handleLearnMore = () => {
+    if (isAuthenticated && orgData) {
+      // For fully setup users, go to getting started
+      navigate('/getting-started');
+    } else {
+      // For others, scroll to features
+      const featuresSection = document.querySelector('.welcome-card:last-child');
+      if (featuresSection) {
+        featuresSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
+
+  // Handle Get Started button click
+  const handleGetStarted = () => {
+    if (!isAuthenticated) {
+      // User is not logged in, redirect to login
+      navigate('/login');
+    } else if (!orgData) {
+      // User is logged in but hasn't completed organization setup
+      navigate('/organization-setup');
+    } else {
+      // User is fully set up, redirect to getting started page
+      navigate('/getting-started');
+    }
+  };
 
   return (
     <div className="page-container">
@@ -26,11 +56,22 @@ export function HomePage() {
           <p>Your elegant mobile-first experience starts here</p>
         )}
         
-        <button className="mobile-button touch-target">
-          Get Started
+        <button 
+          className="mobile-button touch-target"
+          onClick={handleGetStarted}
+        >
+          {!isAuthenticated 
+            ? 'Get Started' 
+            : !orgData 
+              ? 'Complete Setup' 
+              : 'Explore Features'
+          }
         </button>
-        <button className="mobile-button touch-target">
-          Learn More
+        <button 
+          className="mobile-button touch-target"
+          onClick={handleLearnMore}
+        >
+          {isAuthenticated && orgData ? 'View Checklist' : 'Learn More'}
         </button>
       </div>
       

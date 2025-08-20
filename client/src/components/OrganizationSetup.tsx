@@ -76,8 +76,8 @@ export function OrganizationSetup() {
       
       localStorage.setItem('organizationSetup', JSON.stringify(orgData));
       
-      // Navigate to main app
-      navigate('/');
+      // Navigate to setup complete page
+      navigate('/setup-complete');
     }
   };
 
