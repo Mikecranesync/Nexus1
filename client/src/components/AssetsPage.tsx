@@ -383,7 +383,7 @@ export function AssetsPage() {
             </div>
             <div className="asset-actions">
               <button className="action-btn" onClick={() => navigate(`/assets/${asset.id}`)}>View</button>
-              <button className="action-btn">Edit</button>
+              <button className="action-btn" onClick={() => navigate(`/assets/${asset.id}/edit`)}>Edit</button>
             </div>
           </div>
         ))}

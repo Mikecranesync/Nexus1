@@ -8,6 +8,7 @@ import { SetupComplete } from './components/SetupComplete';
 import { GettingStarted } from './components/GettingStarted';
 import { AssetsPage } from './components/AssetsPage';
 import { AssetDetails } from './components/AssetDetails';
+import { AssetEditPage } from './components/AssetEditPage';
 import { WorkOrdersPage } from './components/WorkOrdersPage';
 import { WorkOrderDetails } from './components/WorkOrderDetails';
 import { WorkOrderEdit } from './components/WorkOrderEdit';
@@ -30,6 +31,7 @@ function App() {
               <Route path="/getting-started" element={<GettingStarted />} />
               <Route path="/assets" element={<AssetsPage />} />
               <Route path="/assets/:id" element={<AssetDetails />} />
+              <Route path="/assets/:id/edit" element={<AssetEditPage />} />
               <Route path="/work-orders" element={<WorkOrdersPage />} />
               <Route path="/work-orders/:id" element={<WorkOrderDetails />} />
               <Route path="/work-orders/:id/edit" element={<WorkOrderEdit />} />

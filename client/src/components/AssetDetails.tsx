@@ -109,8 +109,7 @@ export function AssetDetails() {
   }, [id, navigate]);
 
   const handleEdit = () => {
-    // Navigate to edit page (to be implemented)
-    console.log('Edit asset:', id);
+    navigate(`/assets/${id}/edit`);
   };
 
   const handleWorkOrder = () => {
@@ -285,52 +284,64 @@ export function AssetDetails() {
                   const imageUrls = typeof asset.imageUrls === 'string' 
                     ? JSON.parse(asset.imageUrls || '[]')
                     : asset.imageUrls || [];
-                  return imageUrls.length > 0 ? (
-                  <div className="media-section">
-                    <h4>Images</h4>
-                    <div className="images-grid">
-                      {imageUrls.map((url, index) => (
-                        <div key={index} className="image-thumbnail" onClick={() => setSelectedImage(url)}>
-                          <img src={url} alt={`Asset ${index + 1}`} />
+                  
+                  if (imageUrls.length > 0) {
+                    return (
+                      <div className="media-section">
+                        <h4>Images</h4>
+                        <div className="images-grid">
+                          {imageUrls.map((url, index) => (
+                            <div key={index} className="image-thumbnail" onClick={() => setSelectedImage(url)}>
+                              <img src={url} alt={`Asset ${index + 1}`} />
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="document-placeholder">
-                    <span className="document-icon">📷</span>
-                    <p>No photos uploaded</p>
-                  </div>
-                )})()}
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="document-placeholder">
+                        <span className="document-icon">📷</span>
+                        <p>No photos uploaded</p>
+                      </div>
+                    );
+                  }
+                })()}
                 
                 {/* Files Section */}
                 {(() => {
                   const fileUrls = typeof asset.fileUrls === 'string' 
                     ? JSON.parse(asset.fileUrls || '[]')
                     : asset.fileUrls || [];
-                  return fileUrls.length > 0 ? (
-                  <div className="media-section">
-                    <h4>Documents</h4>
-                    <div className="files-list">
-                      {fileUrls.map((url, index) => {
-                        const fileName = url.split('/').pop() || `Document ${index + 1}`;
-                        return (
-                          <div key={index} className="file-item">
-                            <span className="file-icon">📄</span>
-                            <a href={url} target="_blank" rel="noopener noreferrer" className="file-link">
-                              {fileName}
-                            </a>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="document-placeholder">
-                    <span className="document-icon">📄</span>
-                    <p>No documents uploaded</p>
-                  </div>
-                )})()}
+                    
+                  if (fileUrls.length > 0) {
+                    return (
+                      <div className="media-section">
+                        <h4>Documents</h4>
+                        <div className="files-list">
+                          {fileUrls.map((url, index) => {
+                            const fileName = url.split('/').pop() || `Document ${index + 1}`;
+                            return (
+                              <div key={index} className="file-item">
+                                <span className="file-icon">📄</span>
+                                <a href={url} target="_blank" rel="noopener noreferrer" className="file-link">
+                                  {fileName}
+                                </a>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="document-placeholder">
+                        <span className="document-icon">📄</span>
+                        <p>No documents uploaded</p>
+                      </div>
+                    );
+                  }
+                })()}
               </div>
             </div>
           </div>
