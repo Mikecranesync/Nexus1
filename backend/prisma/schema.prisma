@@ -1,0 +1,257 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  industry    String?
+  address     String?
+  phone       String?
+  email       String?
+  website     String?
+  logoUrl     String?
+  timezone    String   @default("UTC")
+  settings    Json?    // JSON field for organization-specific settings
+  
+  // Relations
+  users       User[]
+  assets      Asset[]
+  workOrders  WorkOrder[]
+  activityLogs ActivityLog[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("organizations")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  givenName       String?
+  familyName      String?
+  picture         String?
+  locale          String?
+  googleId        String?   @unique
+  role            UserRole  @default(USER)
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  
+  // Organization relation
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  
+  // Relations
+  createdAssets      Asset[]     @relation("AssetCreator")
+  assignedWorkOrders WorkOrder[] @relation("AssignedUser")
+  createdWorkOrders  WorkOrder[] @relation("WorkOrderCreator")
+  workOrderComments  WorkOrderComment[]
+  activityLogs       ActivityLog[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Asset {
+  id              String      @id @default(cuid())
+  name            String
+  description     String?
+  type            String
+  category        String?
+  location        String
+  status          AssetStatus @default(ACTIVE)
+  criticality     Criticality @default(MEDIUM)
+  
+  // Asset details
+  manufacturer    String?
+  model           String?
+  serialNumber    String?
+  purchaseDate    DateTime?
+  warrantyExpiry  DateTime?
+  installationDate DateTime?
+  
+  // Maintenance
+  lastMaintenance DateTime?
+  nextMaintenance DateTime?
+  maintenanceInterval Int?    // in days
+  
+  // Financial
+  purchasePrice   Float?
+  currentValue    Float?
+  depreciationRate Float?
+  
+  // Additional data
+  specifications  Json?       // JSON field for technical specs
+  documents       Json?       // JSON field for document URLs/metadata
+  imageUrls       String?     @default("[]") // JSON array of image URLs from S3
+  fileUrls        String?     @default("[]") // JSON array of file URLs from S3
+  notes           String?
+  
+  // Relations
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  createdById     String
+  createdBy       User         @relation("AssetCreator", fields: [createdById], references: [id])
+  workOrders      WorkOrder[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("assets")
+}
+
+model WorkOrder {
+  id                String          @id @default(cuid())
+  workOrderNumber   String          @unique
+  title             String
+  description       String?
+  status            WorkOrderStatus @default(OPEN)
+  priority          Priority        @default(MEDIUM)
+  type              String?         // e.g., "Preventive", "Corrective", "Emergency"
+  
+  // Scheduling
+  dueDate           DateTime?
+  scheduledDate     DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  
+  // Time tracking
+  estimatedHours    Float?
+  actualHours       Float?
+  
+  // Relations
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  
+  assetId           String?
+  asset             Asset?       @relation(fields: [assetId], references: [id])
+  
+  assignedToId      String?
+  assignedTo        User?        @relation("AssignedUser", fields: [assignedToId], references: [id])
+  
+  createdById       String
+  createdBy         User         @relation("WorkOrderCreator", fields: [createdById], references: [id])
+  
+  // Additional data
+  instructions      String?
+  parts             Json?        // JSON field for parts/materials
+  tools             Json?        // JSON field for required tools
+  safetyNotes       String?
+  notes             String?
+  
+  // Relations
+  comments          WorkOrderComment[]
+  activities        ActivityLog[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("work_orders")
+}
+
+model WorkOrderComment {
+  id           String    @id @default(cuid())
+  content      String
+  type         CommentType @default(COMMENT)
+  
+  // Relations
+  workOrderId  String
+  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  
+  authorId     String
+  author       User      @relation(fields: [authorId], references: [id])
+  
+  // Metadata for system comments
+  metadata     Json?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("work_order_comments")
+}
+
+model ActivityLog {
+  id           String       @id @default(cuid())
+  action       String       // e.g., "created", "updated", "deleted", "status_changed"
+  entityType   String       // e.g., "Asset", "WorkOrder", "User"
+  entityId     String       // ID of the affected entity
+  oldValues    Json?        // Previous state
+  newValues    Json?        // New state
+  description  String?      // Human-readable description
+  
+  // Relations
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  
+  userId       String?
+  user         User?        @relation(fields: [userId], references: [id])
+  
+  workOrderId  String?
+  workOrder    WorkOrder?   @relation(fields: [workOrderId], references: [id])
+  
+  createdAt    DateTime @default(now())
+
+  @@map("activity_logs")
+}
+
+// Enums
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  TECHNICIAN
+  USER
+}
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  UNDER_MAINTENANCE
+  RETIRED
+  DISPOSED
+}
+
+enum Criticality {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum WorkOrderStatus {
+  OPEN
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum CommentType {
+  COMMENT
+  STATUS_CHANGE
+  ASSIGNMENT
+  SYSTEM
+}

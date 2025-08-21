@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MobileNav } from './components/MobileNav';
 import { HomePage } from './components/HomePage';
+import { Dashboard } from './components/Dashboard';
 import { LoginPage } from './components/LoginPage';
 import { OrganizationSetup } from './components/OrganizationSetup';
 import { SetupComplete } from './components/SetupComplete';
@@ -22,6 +23,7 @@ function App() {
           <main className="mobile-content">
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/organization-setup" element={<OrganizationSetup />} />
               <Route path="/setup-complete" element={<SetupComplete />} />

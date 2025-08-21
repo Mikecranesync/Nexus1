@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { assetAPI, uploadAPI } from '../services/api';
 
 interface Asset {
   id: string;
   name: string;
+  type: string;
   location: string;
-  criticality: 'Low' | 'Medium' | 'High' | 'Critical';
+  criticality: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   description: string;
   manufacturer: string;
   model: string;
@@ -13,10 +15,12 @@ interface Asset {
   purchaseDate: string;
   warrantyExpiry: string;
   category: string;
-  status: 'Active' | 'Inactive' | 'Under Maintenance';
-  pictures: string[];
-  files: string[];
+  status: 'ACTIVE' | 'INACTIVE' | 'UNDER_MAINTENANCE';
+  imageUrls: string | string[];
+  fileUrls: string | string[];
   createdAt: string;
+  organizationId: string;
+  createdById: string;
 }
 
 interface HistoryItem {
@@ -28,10 +32,10 @@ interface HistoryItem {
 }
 
 const criticalityColors = {
-  'Low': '#4CAF50',
-  'Medium': '#FF9800',
-  'High': '#FF5722',
-  'Critical': '#F44336'
+  'LOW': '#4CAF50',
+  'MEDIUM': '#FF9800',
+  'HIGH': '#FF5722',
+  'CRITICAL': '#F44336'
 };
 
 export function AssetDetails() {
@@ -40,38 +44,68 @@ export function AssetDetails() {
   const [asset, setAsset] = useState<Asset | null>(null);
   const [activeTab, setActiveTab] = useState<'details' | 'history'>('details');
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load asset from localStorage
-    const savedAssets = localStorage.getItem('assets');
-    if (savedAssets) {
+    const fetchAsset = async () => {
+      if (!id) return;
+      
       try {
-        const assets = JSON.parse(savedAssets);
-        const foundAsset = assets.find((a: Asset) => a.id === id);
-        if (foundAsset) {
-          setAsset(foundAsset);
+        setIsLoading(true);
+        const response = await assetAPI.getById(id);
+        
+        if (response.success) {
+          setAsset(response.data);
           
           // Generate sample history
           setHistory([
             {
               id: '1',
-              date: foundAsset.createdAt,
+              date: response.data.createdAt,
               type: 'Created',
               description: 'Asset was created and added to inventory',
               user: 'System'
             }
           ]);
         } else {
-          // Asset not found, redirect to assets page
-          navigate('/assets');
+          throw new Error('Asset not found');
         }
       } catch (error) {
         console.error('Error loading asset:', error);
-        navigate('/assets');
+        setError('Failed to load asset');
+        
+        // Fallback to localStorage
+        const savedAssets = localStorage.getItem('assets');
+        if (savedAssets) {
+          try {
+            const assets = JSON.parse(savedAssets);
+            const foundAsset = assets.find((a: Asset) => a.id === id);
+            if (foundAsset) {
+              setAsset(foundAsset);
+              setHistory([{
+                id: '1',
+                date: foundAsset.createdAt,
+                type: 'Created',
+                description: 'Asset was created and added to inventory',
+                user: 'System'
+              }]);
+            } else {
+              navigate('/assets');
+            }
+          } catch (e) {
+            navigate('/assets');
+          }
+        } else {
+          navigate('/assets');
+        }
+      } finally {
+        setIsLoading(false);
       }
-    } else {
-      navigate('/assets');
-    }
+    };
+    
+    fetchAsset();
   }, [id, navigate]);
 
   const handleEdit = () => {
@@ -174,8 +208,8 @@ export function AssetDetails() {
                   <span className="info-icon">🔄</span>
                   <h3>Status</h3>
                 </div>
-                <p className={`status-display ${asset.status.toLowerCase().replace(' ', '-')}`}>
-                  {asset.status}
+                <p className={`status-display ${asset.status.toLowerCase().replace('_', '-')}`}>
+                  {asset.status.replace(/_/g, ' ')}
                 </p>
               </div>
 
@@ -245,18 +279,58 @@ export function AssetDetails() {
               {/* Documents Section */}
               <div className="detail-section">
                 <h3>Documents & Media</h3>
-                <div className="documents-grid">
+                
+                {/* Images Section */}
+                {(() => {
+                  const imageUrls = typeof asset.imageUrls === 'string' 
+                    ? JSON.parse(asset.imageUrls || '[]')
+                    : asset.imageUrls || [];
+                  return imageUrls.length > 0 ? (
+                  <div className="media-section">
+                    <h4>Images</h4>
+                    <div className="images-grid">
+                      {imageUrls.map((url, index) => (
+                        <div key={index} className="image-thumbnail" onClick={() => setSelectedImage(url)}>
+                          <img src={url} alt={`Asset ${index + 1}`} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
                   <div className="document-placeholder">
                     <span className="document-icon">📷</span>
                     <p>No photos uploaded</p>
-                    <button className="upload-btn">Upload Photos</button>
                   </div>
+                )})()}
+                
+                {/* Files Section */}
+                {(() => {
+                  const fileUrls = typeof asset.fileUrls === 'string' 
+                    ? JSON.parse(asset.fileUrls || '[]')
+                    : asset.fileUrls || [];
+                  return fileUrls.length > 0 ? (
+                  <div className="media-section">
+                    <h4>Documents</h4>
+                    <div className="files-list">
+                      {fileUrls.map((url, index) => {
+                        const fileName = url.split('/').pop() || `Document ${index + 1}`;
+                        return (
+                          <div key={index} className="file-item">
+                            <span className="file-icon">📄</span>
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="file-link">
+                              {fileName}
+                            </a>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
                   <div className="document-placeholder">
                     <span className="document-icon">📄</span>
                     <p>No documents uploaded</p>
-                    <button className="upload-btn">Upload Documents</button>
                   </div>
-                </div>
+                )})()}
               </div>
             </div>
           </div>
@@ -292,6 +366,16 @@ export function AssetDetails() {
           </div>
         )}
       </div>
+      
+      {/* Image Modal */}
+      {selectedImage && (
+        <div className="image-modal" onClick={() => setSelectedImage(null)}>
+          <div className="image-modal-content">
+            <button className="close-modal" onClick={() => setSelectedImage(null)}>×</button>
+            <img src={selectedImage} alt="Asset" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

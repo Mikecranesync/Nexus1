@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rmdir:*)",
+      "Bash(rm:*)",
+      "Bash(npm create:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss init:*)",
+      "Bash(node_modules/.bin/tailwindcss:*)",
+      "Bash(./node_modules/.bin/tailwindcss:*)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\hharp\\OneDrive\\Desktop\\Nexus1"
+    ]
+  }
+}

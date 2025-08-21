@@ -17,6 +17,45 @@ export function MobileNav() {
       
       {isAuthenticated ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <Link 
+            to="/dashboard" 
+            style={{
+              color: 'white',
+              textDecoration: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '15px',
+              background: location.pathname.startsWith('/dashboard') ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
+              fontSize: '0.9rem'
+            }}
+          >
+            Dashboard
+          </Link>
+          <Link 
+            to="/assets" 
+            style={{
+              color: 'white',
+              textDecoration: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '15px',
+              background: location.pathname.startsWith('/assets') ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
+              fontSize: '0.9rem'
+            }}
+          >
+            Assets
+          </Link>
+          <Link 
+            to="/work-orders" 
+            style={{
+              color: 'white',
+              textDecoration: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '15px',
+              background: location.pathname.startsWith('/work-orders') ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
+              fontSize: '0.9rem'
+            }}
+          >
+            Work Orders
+          </Link>
           {user?.picture && (
             <img 
               src={user.picture} 

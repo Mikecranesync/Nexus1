@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilterBar, type FilterField, type FilterValue } from './FilterBar';
+import { assetAPI, uploadAPI } from '../services/api';
 
 interface Asset {
   id: string;
   name: string;
+  type: string;
   location: string;
-  criticality: 'Low' | 'Medium' | 'High' | 'Critical';
+  criticality: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   description: string;
   manufacturer: string;
   model: string;
@@ -14,16 +16,19 @@ interface Asset {
   purchaseDate: string;
   warrantyExpiry: string;
   category: string;
-  status: 'Active' | 'Inactive' | 'Under Maintenance';
-  pictures: string[];
-  files: string[];
+  status: 'ACTIVE' | 'INACTIVE' | 'UNDER_MAINTENANCE';
+  imageUrls: string[];
+  fileUrls: string[];
   createdAt: string;
+  organizationId: string;
+  createdById: string;
 }
 
 interface NewAssetFormData {
   name: string;
+  type: string;
   location: string;
-  criticality: 'Low' | 'Medium' | 'High' | 'Critical';
+  criticality: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   description: string;
   manufacturer: string;
   model: string;
@@ -31,15 +36,16 @@ interface NewAssetFormData {
   purchaseDate: string;
   warrantyExpiry: string;
   category: string;
-  status: 'Active' | 'Inactive' | 'Under Maintenance';
-  pictures: string[];
-  files: string[];
+  status: 'ACTIVE' | 'INACTIVE' | 'UNDER_MAINTENANCE';
+  selectedImages: File[];
+  selectedFiles: File[];
 }
 
 const initialFormData: NewAssetFormData = {
   name: '',
+  type: '',
   location: '',
-  criticality: 'Medium',
+  criticality: 'MEDIUM',
   description: '',
   manufacturer: '',
   model: '',
@@ -47,9 +53,9 @@ const initialFormData: NewAssetFormData = {
   purchaseDate: '',
   warrantyExpiry: '',
   category: '',
-  status: 'Active',
-  pictures: [],
-  files: []
+  status: 'ACTIVE',
+  selectedImages: [],
+  selectedFiles: []
 };
 
 const categories = [
@@ -64,11 +70,21 @@ const categories = [
 ];
 
 const criticalityColors = {
-  'Low': '#4CAF50',
-  'Medium': '#FF9800',
-  'High': '#FF5722',
-  'Critical': '#F44336'
+  'LOW': '#4CAF50',
+  'MEDIUM': '#FF9800',
+  'HIGH': '#FF5722',
+  'CRITICAL': '#F44336'
 };
+
+const assetTypes = [
+  'Equipment',
+  'Vehicle',
+  'Building',
+  'Tool',
+  'Computer',
+  'Furniture',
+  'Other'
+];
 
 export function AssetsPage() {
   const navigate = useNavigate();
@@ -78,46 +94,138 @@ export function AssetsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [filters, setFilters] = useState<FilterValue[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Get default values from localStorage or use defaults
+  const organizationId = localStorage.getItem('organizationId') || 'default-org';
+  const userId = localStorage.getItem('userId') || 'default-user';
 
-  // Load assets from localStorage on component mount
+  // Load assets from backend on component mount
   useEffect(() => {
-    const savedAssets = localStorage.getItem('assets');
-    if (savedAssets) {
+    const fetchAssets = async () => {
       try {
-        setAssets(JSON.parse(savedAssets));
+        setIsLoading(true);
+        const response = await assetAPI.getAll({ organizationId });
+        if (response.success) {
+          setAssets(response.data);
+        }
       } catch (error) {
         console.error('Error loading assets:', error);
+        setError('Failed to load assets');
+        // Fallback to localStorage
+        const savedAssets = localStorage.getItem('assets');
+        if (savedAssets) {
+          try {
+            setAssets(JSON.parse(savedAssets));
+          } catch (e) {
+            console.error('Error parsing saved assets:', e);
+          }
+        }
+      } finally {
+        setIsLoading(false);
       }
-    }
-  }, []);
+    };
+    
+    fetchAssets();
+  }, [organizationId]);
 
-  // Save assets to localStorage whenever assets change
-  useEffect(() => {
-    localStorage.setItem('assets', JSON.stringify(assets));
-  }, [assets]);
-
-  const handleInputChange = (field: keyof NewAssetFormData, value: string | string[]) => {
+  const handleInputChange = (field: keyof NewAssetFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setFormData(prev => ({ ...prev, selectedImages: [...prev.selectedImages, ...files] }));
+  };
+  
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setFormData(prev => ({ ...prev, selectedFiles: [...prev.selectedFiles, ...files] }));
+  };
+  
+  const removeSelectedImage = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedImages: prev.selectedImages.filter((_, i) => i !== index)
+    }));
+  };
+  
+  const removeSelectedFile = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedFiles: prev.selectedFiles.filter((_, i) => i !== index)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
 
     try {
-      const newAsset: Asset = {
-        ...formData,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString()
+      let imageUrls: string[] = [];
+      let fileUrls: string[] = [];
+      
+      // Upload images and files if selected
+      if (formData.selectedImages.length > 0 || formData.selectedFiles.length > 0) {
+        const allFiles = [...formData.selectedImages, ...formData.selectedFiles];
+        const uploadResponse = await uploadAPI.uploadFiles(
+          allFiles,
+          organizationId,
+          userId
+        );
+        
+        if (uploadResponse.success) {
+          const uploadedFiles = uploadResponse.data.files;
+          imageUrls = uploadedFiles
+            .filter((f: any) => f.isImage)
+            .map((f: any) => f.url);
+          fileUrls = uploadedFiles
+            .filter((f: any) => !f.isImage)
+            .map((f: any) => f.url);
+        }
+      }
+      
+      // Create asset with file URLs
+      const assetData = {
+        name: formData.name,
+        type: formData.type,
+        description: formData.description,
+        location: formData.location,
+        status: formData.status,
+        criticality: formData.criticality,
+        category: formData.category,
+        manufacturer: formData.manufacturer,
+        model: formData.model,
+        serialNumber: formData.serialNumber,
+        purchaseDate: formData.purchaseDate || null,
+        warrantyExpiry: formData.warrantyExpiry || null,
+        imageUrls,
+        fileUrls,
+        organizationId,
+        createdById: userId
       };
-
-      setAssets(prev => [...prev, newAsset]);
-      setFormData(initialFormData);
-      setShowForm(false);
-      // Navigate to the new asset's details page
-      navigate(`/assets/${newAsset.id}`);
-    } catch (error) {
+      
+      const response = await assetAPI.create(assetData);
+      
+      if (response.success) {
+        // Update local state
+        setAssets(prev => [...prev, response.data]);
+        // Also save to localStorage as backup
+        localStorage.setItem('assets', JSON.stringify([...assets, response.data]));
+        setFormData(initialFormData);
+        setShowForm(false);
+        // Navigate to the new asset's details page
+        navigate(`/assets/${response.data.id}`);
+      } else {
+        throw new Error(response.message || 'Failed to create asset');
+      }
+    } catch (error: any) {
       console.error('Error creating asset:', error);
+      setError(error.message || 'Failed to create asset');
     } finally {
       setIsSubmitting(false);
     }
@@ -172,9 +280,9 @@ export function AssetsPage() {
       label: 'Status',
       type: 'select',
       options: [
-        { value: 'Active', label: 'Active' },
-        { value: 'Inactive', label: 'Inactive' },
-        { value: 'Under Maintenance', label: 'Under Maintenance' }
+        { value: 'ACTIVE', label: 'Active' },
+        { value: 'INACTIVE', label: 'Inactive' },
+        { value: 'UNDER_MAINTENANCE', label: 'Under Maintenance' }
       ]
     },
     {
@@ -182,10 +290,10 @@ export function AssetsPage() {
       label: 'Criticality',
       type: 'select',
       options: [
-        { value: 'Low', label: 'Low' },
-        { value: 'Medium', label: 'Medium' },
-        { value: 'High', label: 'High' },
-        { value: 'Critical', label: 'Critical' }
+        { value: 'LOW', label: 'Low' },
+        { value: 'MEDIUM', label: 'Medium' },
+        { value: 'HIGH', label: 'High' },
+        { value: 'CRITICAL', label: 'Critical' }
       ]
     },
     {
@@ -260,8 +368,8 @@ export function AssetsPage() {
               </div>
               <div className="asset-detail">
                 <span className="label">Status:</span>
-                <span className={`status-badge ${asset.status.toLowerCase().replace(' ', '-')}`}>
-                  {asset.status}
+                <span className={`status-badge ${asset.status.toLowerCase().replace('_', '-')}`}>
+                  {asset.status.replace(/_/g, ' ')}
                 </span>
               </div>
               <div className="asset-detail">
@@ -312,7 +420,16 @@ export function AssetsPage() {
         </button>
       </div>
 
-      {assets.length === 0 ? <EmptyState /> : <AssetsList />}
+      {isLoading ? (
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Loading assets...</p>
+        </div>
+      ) : assets.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <AssetsList />
+      )}
 
       {/* Sliding Form Panel */}
       <div className={`form-panel ${showForm ? 'show' : ''}`}>
@@ -337,6 +454,21 @@ export function AssetsPage() {
                     placeholder="Enter asset name"
                     required
                   />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="type">Asset Type *</label>
+                  <select
+                    id="type"
+                    value={formData.type}
+                    onChange={(e) => handleInputChange('type', e.target.value)}
+                    required
+                  >
+                    <option value="">Select type</option>
+                    {assetTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="form-field">
@@ -374,10 +506,10 @@ export function AssetsPage() {
                     onChange={(e) => handleInputChange('criticality', e.target.value as any)}
                     required
                   >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Critical">Critical</option>
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                    <option value="CRITICAL">Critical</option>
                   </select>
                 </div>
               </div>
@@ -437,9 +569,9 @@ export function AssetsPage() {
                     value={formData.status}
                     onChange={(e) => handleInputChange('status', e.target.value as any)}
                   >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                    <option value="Under Maintenance">Under Maintenance</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="UNDER_MAINTENANCE">Under Maintenance</option>
                   </select>
                 </div>
 
@@ -472,16 +604,28 @@ export function AssetsPage() {
                   <label htmlFor="pictures">Pictures</label>
                   <div className="file-upload-area">
                     <input
+                      ref={imageInputRef}
                       type="file"
                       id="pictures"
                       accept="image/*"
                       multiple
+                      onChange={handleImageSelect}
                       style={{ display: 'none' }}
                     />
                     <label htmlFor="pictures" className="file-upload-btn">
                       📷 Add Photos
                     </label>
                     <p>Upload photos of the asset</p>
+                    {formData.selectedImages.length > 0 && (
+                      <div className="selected-files">
+                        {formData.selectedImages.map((file, index) => (
+                          <div key={index} className="selected-file">
+                            <span>{file.name}</span>
+                            <button type="button" onClick={() => removeSelectedImage(index)}>×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -489,19 +633,38 @@ export function AssetsPage() {
                   <label htmlFor="files">Files</label>
                   <div className="file-upload-area">
                     <input
+                      ref={fileInputRef}
                       type="file"
                       id="files"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
                       multiple
+                      onChange={handleFileSelect}
                       style={{ display: 'none' }}
                     />
                     <label htmlFor="files" className="file-upload-btn">
                       📎 Add Files
                     </label>
                     <p>Manuals, specifications, etc.</p>
+                    {formData.selectedFiles.length > 0 && (
+                      <div className="selected-files">
+                        {formData.selectedFiles.map((file, index) => (
+                          <div key={index} className="selected-file">
+                            <span>{file.name}</span>
+                            <button type="button" onClick={() => removeSelectedFile(index)}>×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
+            
+            {error && (
+              <div className="error-message">
+                {error}
+              </div>
+            )}
 
             <div className="form-actions">
               <button type="button" className="cancel-btn" onClick={handleCancel}>
